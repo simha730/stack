@@ -1,0 +1,52 @@
+/**
+ * Definition for a binary tree node.
+ * struct TreeNode {
+ *     int val;
+ *     struct TreeNode *left;
+ *     struct TreeNode *right;
+ * };
+ */
+#include <stdlib.h>
+
+
+int countNodes(struct TreeNode* root) {
+    if (!root) return 0;
+    return 1 + countNodes(root->left) + countNodes(root->right);
+}
+
+void inorder(struct TreeNode* root, int* arr, int* index) {
+    if (!root) return;
+    inorder(root->left, arr, index);
+    arr[(*index)++] = root->val;
+    inorder(root->right, arr, index);
+}
+
+struct TreeNode* buildBST(int* arr, int start, int end) {
+    if (start > end) return NULL;
+
+    int mid = (start + end) / 2;
+    struct TreeNode* node = (struct TreeNode*)malloc(sizeof(struct TreeNode));
+    node->val = arr[mid];
+    node->left = buildBST(arr, start, mid - 1);
+    node->right = buildBST(arr, mid + 1, end);
+    return node;
+}
+
+
+struct TreeNode* balanceBST(struct TreeNode* root) {
+    if (!root) return NULL;
+
+    // count total nodes
+    int n = countNodes(root);
+
+    // allocate exact memory needed
+    int* arr = (int*)malloc(n * sizeof(int));
+    int index = 0;
+    inorder(root, arr, &index);
+
+    // build balanced BST
+    struct TreeNode* newRoot = buildBST(arr, 0, n - 1);
+
+    free(arr); // clean up memory
+    return newRoot;
+}
