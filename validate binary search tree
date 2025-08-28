@@ -1,0 +1,35 @@
+/**
+ * Definition for a binary tree node.
+ * struct TreeNode {
+ *     int val;
+ *     struct TreeNode *left;
+ *     struct TreeNode *right;
+ * };
+ */
+#include <stdbool.h>
+#include <limits.h>
+
+long prev;
+bool firstNode;
+
+bool inorder(struct TreeNode *root) {
+    if (root == NULL) return true;
+
+    // Traverse left subtree
+    if (!inorder(root->left)) return false;
+
+    // Check current node
+    if (!firstNode && root->val <= prev) return false;
+    
+    firstNode = false;
+    prev = root->val;
+
+    // Traverse right subtree
+    return inorder(root->right);
+}
+
+bool isValidBST(struct TreeNode* root) {
+    prev = LONG_MIN;
+    firstNode = true;
+    return inorder(root);
+}
