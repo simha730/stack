@@ -1,0 +1,132 @@
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+
+#define MAX_SIZE 50005
+
+typedef struct {
+    int* arr;
+    int size;
+    int isMinHeap; // 0 = max-heap, 1 = min-heap
+} Heap;
+
+typedef struct {
+    Heap* left;  // max-heap for smaller half
+    Heap* right; // min-heap for larger half
+} MedianFinder;
+
+// ---- Heap Utilities ----
+Heap* createHeap(int isMinHeap) {
+    Heap* h = (Heap*)malloc(sizeof(Heap));
+    h->arr = (int*)malloc(MAX_SIZE * sizeof(int));
+    h->size = 0;
+    h->isMinHeap = isMinHeap;
+    return h;
+}
+
+int compare(Heap* h, int a, int b) {
+    return h->isMinHeap ? a < b : a > b;
+}
+
+void heapSwap(int* a, int* b) {
+    int tmp = *a;
+    *a = *b;
+    *b = tmp;
+}
+
+void heapPush(Heap* h, int val) {
+    h->arr[h->size] = val;
+    int i = h->size;
+    h->size++;
+
+    // bubble up
+    while (i > 0) {
+        int parent = (i - 1) / 2;
+        if (compare(h, h->arr[i], h->arr[parent])) {
+            heapSwap(&h->arr[i], &h->arr[parent]);
+            i = parent;
+        } else break;
+    }
+}
+
+int heapTop(Heap* h) {
+    return h->arr[0];
+}
+
+int heapPop(Heap* h) {
+    if (h->size == 0) return -1;
+
+    int top = h->arr[0];
+    h->arr[0] = h->arr[h->size - 1];
+    h->size--;
+
+    // bubble down
+    int i = 0;
+    while (1) {
+        int left = 2 * i + 1;
+        int right = 2 * i + 2;
+        int best = i;
+
+        if (left < h->size && compare(h, h->arr[left], h->arr[best]))
+            best = left;
+        if (right < h->size && compare(h, h->arr[right], h->arr[best]))
+            best = right;
+
+        if (best != i) {
+            heapSwap(&h->arr[i], &h->arr[best]);
+            i = best;
+        } else break;
+    }
+
+    return top;
+}
+
+// ---- MedianFinder ----
+MedianFinder* medianFinderCreate() {
+    MedianFinder* obj = (MedianFinder*)malloc(sizeof(MedianFinder));
+    obj->left = createHeap(0);  // max-heap
+    obj->right = createHeap(1); // min-heap
+    return obj;
+}
+
+void medianFinderAddNum(MedianFinder* obj, int num) {
+    if (obj->left->size == 0 || num <= heapTop(obj->left)) {
+        heapPush(obj->left, num);
+    } else {
+        heapPush(obj->right, num);
+    }
+
+    // balance heaps
+    if (obj->left->size > obj->right->size + 1) {
+        heapPush(obj->right, heapPop(obj->left));
+    } else if (obj->right->size > obj->left->size) {
+        heapPush(obj->left, heapPop(obj->right));
+    }
+}
+
+double medianFinderFindMedian(MedianFinder* obj) {
+    if (obj->left->size > obj->right->size) {
+        return (double)heapTop(obj->left);
+    } else {
+        return ((double)heapTop(obj->left) + (double)heapTop(obj->right)) / 2.0;
+    }
+}
+
+void medianFinderFree(MedianFinder* obj) {
+    free(obj->left->arr);
+    free(obj->right->arr);
+    free(obj->left);
+    free(obj->right);
+    free(obj);
+}
+
+/**
+ * Example usage:
+ * MedianFinder* obj = medianFinderCreate();
+ * medianFinderAddNum(obj, 1);
+ * medianFinderAddNum(obj, 2);
+ * printf("%f\n", medianFinderFindMedian(obj)); // 1.5
+ * medianFinderAddNum(obj, 3);
+ * printf("%f\n", medianFinderFindMedian(obj)); // 2.0
+ * medianFinderFree(obj);
+ */
