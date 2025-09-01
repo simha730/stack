@@ -1,0 +1,188 @@
+#include <stdio.h>
+#include <stdlib.h>
+#include <stdbool.h>
+#include <time.h>
+
+#define MAX_LEVEL 16
+#define P_FACTOR 0.5
+
+typedef struct SkiplistNode {
+    int key;
+    int count;
+    struct SkiplistNode **forward;
+} SkiplistNode;
+
+typedef struct Skiplist {
+    int level;
+    int size;
+    SkiplistNode *header;
+} Skiplist;
+
+SkiplistNode* createNode(int key, int level) {
+    SkiplistNode* node = (SkiplistNode*)malloc(sizeof(SkiplistNode));
+    node->key = key;
+    node->count = 1;
+    node->forward = (SkiplistNode**)calloc(level + 1, sizeof(SkiplistNode*));
+    return node;
+}
+
+Skiplist* skiplistCreate() {
+    srand(time(NULL));
+    Skiplist* list = (Skiplist*)malloc(sizeof(Skiplist));
+    list->level = 0;
+    list->size = 0;
+    list->header = createNode(-1, MAX_LEVEL);
+    return list;
+}
+
+int generateRandomLevel() {
+    int level = 0;
+    while (((double)rand() / RAND_MAX) < P_FACTOR && level < MAX_LEVEL) {
+        level++;
+    }
+    return level;
+}
+
+bool skiplistSearch(Skiplist* obj, int target) {
+    SkiplistNode* current = obj->header;
+    for (int i = obj->level; i >= 0; i--) {
+        while (current->forward[i] && current->forward[i]->key < target) {
+            current = current->forward[i];
+        }
+    }
+    current = current->forward[0];
+    return (current && current->key == target);
+}
+
+void skiplistAdd(Skiplist* obj, int num) {
+    SkiplistNode* update[MAX_LEVEL + 1];
+    SkiplistNode* current = obj->header;
+
+    for (int i = obj->level; i >= 0; i--) {
+        while (current->forward[i] && current->forward[i]->key < num) {
+            current = current->forward[i];
+        }
+        update[i] = current;
+    }
+    current = current->forward[0];
+
+    if (current && current->key == num) {
+        current->count++;
+        obj->size++;
+        return;
+    }
+
+    int newLevel = generateRandomLevel();
+    if (newLevel > obj->level) {
+        for (int i = obj->level + 1; i <= newLevel; i++) {
+            update[i] = obj->header;
+        }
+        obj->level = newLevel;
+    }
+
+    SkiplistNode* newNode = createNode(num, newLevel);
+    for (int i = 0; i <= newLevel; i++) {
+        newNode->forward[i] = update[i]->forward[i];
+        update[i]->forward[i] = newNode;
+    }
+    obj->size++;
+}
+
+bool skiplistErase(Skiplist* obj, int num) {
+    SkiplistNode* update[MAX_LEVEL + 1];
+    SkiplistNode* current = obj->header;
+
+    for (int i = obj->level; i >= 0; i--) {
+        while (current->forward[i] && current->forward[i]->key < num) {
+            current = current->forward[i];
+        }
+        update[i] = current;
+    }
+    current = current->forward[0];
+
+    if (!current || current->key != num) {
+        return false;
+    }
+
+    if (current->count > 1) {
+        current->count--;
+        obj->size--;
+        return true;
+    }
+
+    for (int i = 0; i <= obj->level; i++) {
+        if (update[i]->forward[i] != current) break;
+        update[i]->forward[i] = current->forward[i];
+    }
+    free(current->forward);
+    free(current);
+
+    while (obj->level > 0 && obj->header->forward[obj->level] == NULL) {
+        obj->level--;
+    }
+    obj->size--;
+    return true;
+}
+
+void skiplistRangeSearch(Skiplist* obj, int low, int high) {
+    SkiplistNode* current = obj->header->forward[0];
+    printf("Range [%d, %d]: ", low, high);
+    while (current) {
+        if (current->key >= low && current->key <= high) {
+            for (int i = 0; i < current->count; i++) {
+                printf("%d ", current->key);
+            }
+        }
+        if (current->key > high) break;
+        current = current->forward[0];
+    }
+    printf("\n");
+}
+
+void skiplistPrint(Skiplist* obj) {
+    printf("Skiplist (level=%d, size=%d):\n", obj->level, obj->size);
+    for (int i = obj->level; i >= 0; i--) {
+        SkiplistNode* node = obj->header->forward[i];
+        printf("Level %d: ", i);
+        while (node) {
+            printf("%d(%d) ", node->key, node->count);
+            node = node->forward[i];
+        }
+        printf("\n");
+    }
+}
+
+void skiplistFree(Skiplist* obj) {
+    SkiplistNode* current = obj->header->forward[0];
+    while (current) {
+        SkiplistNode* next = current->forward[0];
+        free(current->forward);
+        free(current);
+        current = next;
+    }
+    free(obj->header->forward);
+    free(obj->header);
+    free(obj);
+}
+
+/*int main() {
+    Skiplist* sl = skiplistCreate();
+
+    skiplistAdd(sl, 10);
+    skiplistAdd(sl, 20);
+    skiplistAdd(sl, 30);
+    skiplistAdd(sl, 20);
+
+    skiplistPrint(sl);
+
+    printf("Search 20: %s\n", skiplistSearch(sl, 20) ? "found" : "not found");
+
+    skiplistRangeSearch(sl, 15, 30);
+
+    skiplistErase(sl, 20);
+    skiplistErase(sl, 10);
+
+    skiplistPrint(sl);
+
+    skiplistFree(sl);
+ */
