@@ -1,162 +1,248 @@
 #include<stdio.h>
 #include<stdlib.h>
-#include<string.h>
-#include "./include/lrucache.h"
 
-//hashing
-unsigned int hash(const char *key)
+#define HASH_SIZE 10007
+
+typedef struct Node
 {
-    unsigned int hash_value = 0;
-    while (*key)
-    {
-        hash_value = (hash_value * 31) + *key++ ;
-    }
+    int key;
+    int value;
+    struct Node* prev;
+    struct Node* next;
+}Node;
 
-    return hash_value % CACHE_SIZE;
+typedef struct Entry 
+{
+    int key;
+    Node* node;
+    struct Entry* next;
+}Entry;
+
+
+typedef struct {
+    int capacity;
+    int size;
+    Entry* hashTable[HASH_SIZE];
+    Node* head;
+    Node* tail;   
+} LRUCache;
+
+unsigned int hash(int key)
+{
+    return key % HASH_SIZE;
 }
 
-//Initialize LRU cache
-lru_cache_t* create_lru_cache(){
-    lru_cache_t *cache = malloc(sizeof(lru_cache_t));
-    if(!cache) return NULL;
-
-    cache->head = NULL;
-    cache->tail = NULL;
-    cache->count = 0;
-    cache->capacity = CACHE_SIZE;
-
-    for (int iterator = 0; iterator < CACHE_SIZE; iterator++)
-    {
-        cache->nodes[iterator] = NULL;
-    }
-
-    return cache;
+//create Node
+Node* createNode(int key, int value)
+{
+    Node* node = (Node*)malloc(sizeof(Node));
+    node->key = key;
+    node->value = value;
+    node->prev = node->next = NULL;
+    return node;
 }
 
-//Push the Node to front (to mark it as MRU)
-void move_to_front(lru_cache_t *cache, cache_node_t *node)
+//add Node to head
+void addToHead(LRUCache* object, Node* node)
 {
-    if(cache->head == node) return;
-
-    if(node->prev) node->prev->next = node->next;
-    if(node->next) node->next->prev = node->prev;
-    if(cache->tail == node) cache->tail = node->prev;
-
+    node->next = object->head;
     node->prev = NULL;
-    node->next = cache->head;
-    if(cache->head) cache->head->prev = node;
-    cache->head = node;
 
-    if(!cache->tail) cache->tail = node;
-
-}
-
-//Add Node at the front
-void add_to_front(lru_cache_t *cache, cache_node_t *node){
-    node->prev = NULL;
-    node->next = cache->head;
-
-    if(cache->head)
+    if(object->head)
     {
-        cache->head->prev = node;
+        object->head->prev = node;
     }
-    cache->head = node;
+    object->head = node;
 
-    if(!cache->tail)
+    if(!object->tail)
     {
-        cache->tail = node;
+        object->tail = node;
     }
 }
 
-//Remove LRU Node
-cache_node_t* remove_lru(lru_cache_t *cache)
+//remove Node
+void removeNode(LRUCache* object, Node* node)
 {
-    if(!cache->tail) return NULL;
-
-    cache_node_t *lru = cache->tail;
-
-    if(cache->tail->prev)
+    if(node->prev)
     {
-        cache->tail->prev->next = NULL;
-    }else
+        node->prev->next = node->next;
+    }
+    else
     {
-        cache->head = NULL;
+        object->head = node->next;
     }
 
-    cache->tail = cache->tail->prev;
-
-    return lru;
+    if(node->next)
+    {
+        node->next->prev = node->prev;
+    }
+    else
+    {
+        object->tail = node->prev;
+    }
 }
 
-// Getter - to get data from the cache
-char* cache_get(lru_cache_t *cache, const char *key) {
-    unsigned int index = hash(key);
-    cache_node_t *current = cache->nodes[index];
+//remove from Tail
+Node* removeTail(LRUCache* object)
+{
+    Node* tail = object->tail;
+    removeNode(object, tail);
+    return tail;
+}
 
-    while (current)
-    {
-        if(strcmp(current->key, key) == 0)
+//moveToHead
+void moveToHead(LRUCache* object, Node* node)
+{
+    removeNode(object, node);
+    addToHead(object, node);
+}
+
+Entry* hashGetEntry(LRUCache* object, int key)
+{
+    unsigned int hashValue = hash(key);
+    Entry* entry = object->hashTable[hashValue];
+
+    while (entry){
+        if(entry->key == key)
         {
-            move_to_front(cache, current);
-            printf("Cache successfully HIT for the key %s \n", key);
-            return current->data;
+            return entry;
         }
-        current = current->next;
+
+        entry = entry->next;
     }
-    printf("Cache MISS for the key %s \n", key);
+
     return NULL;
 }
 
-// Put - to put the data to the cache
-void cache_put(lru_cache_t *cache, const char *key, const char *data)
+//hashget
+Node* hashGet(LRUCache* object, int key)
 {
-    unsigned int index = hash(key);
+    Entry* entry = hashGetEntry(object, key);
+    return entry ? entry->node : NULL;
+}
 
-    char *existing = cache_get(cache, key);
-    if(existing)
+
+
+//hashput
+void hashPut(LRUCache* object, int key, Node* node)
+{
+    Entry* entry = hashGetEntry(object, key);
+
+    if(entry)
     {
-        cache_node_t *current = cache->nodes[index];
-        while (current && strcmp(current->key, key) != 0) {
-            current = current->next;
-        }
-        if(current)
-        {
-            strncpy(current->data, data, DATA_SIZE - 1);
-            current->data[DATA_SIZE - 1] = '\0';
-        }
-        return;
+        entry->node = node;
     }
+    else
+    {
+        unsigned int hashValue = hash(key);
 
-    cache_node_t *new_node = malloc(sizeof(cache_node_t));
-    if(!new_node) return;
+        Entry* newEntry = (Entry*)malloc(sizeof(Entry));
 
-    strncpy(new_node->key, key, KEY_SIZE - 1);
-    new_node->key[KEY_SIZE - 1] = '\0';
+        newEntry->key = key;
+        newEntry->node = node;
+        newEntry->next = object->hashTable[hashValue];
+        object->hashTable[hashValue] = newEntry;
+    }  
+}
 
-    strncpy(new_node->data, data, DATA_SIZE - 1);
-    new_node->data[DATA_SIZE - 1] = '\0';
+//hashremove
+void hashRemove(LRUCache* object, int key)
+{
+    unsigned int hashValue = hash(key);
+    Entry* entry = object->hashTable[hashValue];
+    Entry* prev = NULL;
 
-    new_node->prev = new_node->next = NULL;
-
-    if(cache->count >= cache->capacity){
-        cache_node_t *lru = remove_lru(cache);
-
-        if(lru)
+    while(entry)
+    {
+        if(entry->key == key)
         {
-            unsigned int lru_index = hash(lru->key);
-            if(cache->nodes[lru_index] == lru) {
-                cache->nodes[lru_index] = lru->next;
+            if(prev)
+            {
+                prev->next = entry->next;
             }
-            free(lru);
-            cache->count--;
+            else
+            {
+                object->hashTable[hashValue] = entry->next;
+            }
+
+            free(entry);
+            return;
+        }
+
+        prev = entry;
+        entry = entry->next;
+    }
+}
+
+
+LRUCache* lRUCacheCreate(int capacity) {
+    LRUCache* object = (LRUCache*)malloc(sizeof(LRUCache));
+    object->capacity = capacity;
+    object->size = 0;
+    object->head = object->tail = NULL;
+
+    for (int iterator = 0; iterator <  HASH_SIZE; iterator++)
+    {
+        object->hashTable[iterator] = NULL;
+    }
+    return object;
+}
+
+int lRUCacheGet(LRUCache* obj, int key) {
+    Node* node = hashGet(obj, key);
+
+    if(!node)
+    {
+        return -1;
+    }
+    moveToHead(obj, node);
+    return node->value;
+}
+
+void lRUCachePut(LRUCache* obj, int key, int value) {
+    Node* node = hashGet(obj, key);
+
+    if(node)
+    {
+        node->value = value;
+        moveToHead(obj, node);
+    }
+    else
+    {
+        Node* newNode = createNode(key, value);
+        addToHead(obj, newNode);
+        hashPut(obj, key, newNode);
+        obj->size++;
+
+        if(obj->size > obj->capacity)
+        {
+            Node* tail = removeTail(obj);
+            hashRemove(obj, tail->key);
+            free(tail);
+            obj->size--;
         }
     }
+}
 
-    add_to_front(cache, new_node);
-    new_node->next = cache->nodes[index];
-    cache->nodes[index] = new_node;
-    cache->count++;
+void lRUCacheFree(LRUCache* obj) {
+    Node* current = obj->head;
 
-    printf("Cached key is %s with the data %s \n", key, data);
+    while(current)
+    {
+        Node* next = current->next;
+        free(current);
+        current = next;
+    }
 
+    for(int iterator = 0; iterator < HASH_SIZE; iterator++)
+    {
+        Entry* entry = obj->hashTable[iterator];
+        while(entry)
+        {
+            Entry* next = entry->next;
+            free(entry);
+            entry = next;
+        }
+    }
+    free(obj);
 }
