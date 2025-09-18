@@ -1,7 +1,3 @@
-/**
- * Note: The returned array must be malloced, assume caller calls free().
- */
-
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -9,10 +5,10 @@
 #define HASH_SIZE 1000
 
 typedef struct Node {
-    char *key;       // sorted string (ex: "eat" -> "aet")
-    char **words;    // list of anagrams
-    int count;       // number of words
-    int capacity;    // capacity of array
+    char *key;
+    char **words;
+    int count;
+    int capacity;
     struct Node *next; 
 } Node;
 
@@ -20,7 +16,7 @@ unsigned long hashFunc(const char *str) {
     unsigned long hash = 5381;
     int c;
     while ((c = *str++))
-        hash = ((hash << 5) + hash) + c; // hash * 33 + c
+        hash = ((hash << 5) + hash) + c;
     return hash % HASH_SIZE;
 }
 
@@ -46,7 +42,6 @@ Node* createNode(const char *key, const char *word) {
     node->count = 0;
     node->words = (char **)malloc(sizeof(char *) * node->capacity);
     node->next = NULL;
-
     node->words[node->count++] = strdup(word);
     return node;
 }
@@ -75,14 +70,12 @@ void addWord(Node **table, const char *key, const char *word) {
 char*** groupAnagrams(char** strs, int strsSize, int* returnSize, int** returnColumnSizes) {
     Node *hashTable[HASH_SIZE] = {0};
 
-    // Insert all words into hashTable
     for (int i = 0; i < strsSize; i++) {
         char *sorted = sortString(strs[i]);
         addWord(hashTable, sorted, strs[i]);
         free(sorted);
     }
 
-    // Count total groups
     int groups = 0;
     for (int i = 0; i < HASH_SIZE; i++) {
         Node *cur = hashTable[i];
